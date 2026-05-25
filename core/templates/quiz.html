@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+
+{% block title %}Vocabulary Quiz{% endblock %}
+
+{% load static %}
+
+{% block content %}
+
+<div class="header-text">
+    <h1>Vocabulary Quiz</h1>
+
+    <p>
+        Uji sejauh mana penguasaan kosakata dan idiom bahasa Inggris Anda.
+    </p>
+</div>
+
+<div
+    id="quiz-section"
+
+    class="card"
+
+    style="
+        max-width: 850px;
+        margin: 0 auto;
+        scroll-margin-top: 30px;
+    "
+>
+
+    <div style="
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    ">
+
+        <span style="
+            background: #e7f1ff;
+            color: #2563eb;
+            padding: 0.55rem 1rem;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        ">
+            Vocabulary & Idioms
+        </span>
+
+        <span style="
+            color: #64748b;
+            font-weight: 600;
+        ">
+            Question {{ question_number }} of {{ total_questions }}
+        </span>
+
+    </div>
+
+    <div style="
+        margin-bottom: 2rem;
+    ">
+
+        <h2 style="
+            line-height: 1.5;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #0f172a;
+        ">
+            {{ quiz.question }}
+        </h2>
+
+    </div>
+
+    {% if selected_answer %}
+
+        {% if is_correct %}
+
+        <div style="
+            margin-bottom: 2rem;
+            padding: 1rem 1.2rem;
+            background: #ecfdf3;
+            border: 1px solid #bbf7d0;
+            border-radius: 14px;
+            color: #15803d;
+            font-weight: 600;
+        ">
+            ✅ Correct Answer!
+        </div>
+
+        {% else %}
+
+        <div style="
+            margin-bottom: 2rem;
+            padding: 1rem 1.2rem;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 14px;
+            color: #dc2626;
+            font-weight: 600;
+        ">
+            ❌ Wrong Answer!
+        </div>
+
+        {% endif %}
+
+    {% endif %}
+
+    <form
+        method="POST"
+
+        action="?q={{ question_number|add:'-1' }}#quiz-section"
+    >
+
+        {% csrf_token %}
+
+        <div style="
+            display: grid;
+            gap: 1rem;
+        ">
+
+            {% for option in quiz.options %}
+
+            <button
+                type="submit"
+
+                name="answer"
+
+                value="{{ option|slice:':1' }}"
+
+                class="btn-option"
+
+                style="
+                    text-align: left;
+                    padding: 1.2rem 1.3rem;
+                    border: 1.5px solid #e5e7eb;
+                    background: white;
+                    border-radius: 14px;
+                    cursor: pointer;
+                    transition: 0.25s ease;
+                    width: 100%;
+                    font-size: 1rem;
+                    font-weight: 500;
+                "
+
+                onmouseover="
+                    this.style.border='1.5px solid #6366f1';
+                    this.style.background='#f8faff';
+                    this.style.transform='translateY(-2px)';
+                    this.style.boxShadow='0 8px 20px rgba(99,102,241,0.12)';
+                "
+
+                onmouseout="
+                    this.style.border='1.5px solid #e5e7eb';
+                    this.style.background='white';
+                    this.style.transform='translateY(0px)';
+                    this.style.boxShadow='none';
+                "
+            >
+
+                {{ option }}
+
+            </button>
+
+            {% endfor %}
+
+        </div>
+
+    </form>
+
+    <div style="
+        display: flex;
+        justify-content: space-between;
+        margin-top: 3rem;
+        gap: 1rem;
+        flex-wrap: wrap;
+    ">
+
+        <a
+            href="?q=0#quiz-section"
+
+            class="btn-primary"
+
+            style="
+                background: #e5e7eb;
+                color: #111827;
+                text-decoration: none;
+            "
+        >
+            Restart Quiz
+        </a>
+
+        <a
+            href="?q={{ next_question }}#quiz-section"
+
+            class="btn-primary"
+
+            style="
+                text-decoration: none;
+            "
+        >
+            Next Question →
+        </a>
+
+    </div>
+
+</div>
+
+<script>
+
+    if (window.location.hash === "#quiz-section") {
+
+        window.onload = function () {
+
+            const section = document.getElementById(
+                "quiz-section"
+            );
+
+            if (section) {
+
+                section.scrollIntoView({
+
+                    behavior: "smooth",
+
+                    block: "start"
+
+                });
+
+            }
+
+        };
+
+    }
+
+</script>
+
+{% endblock %}
