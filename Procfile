@@ -1,0 +1,1 @@
+web: gunicorn langlearn_config.wsgi:application
