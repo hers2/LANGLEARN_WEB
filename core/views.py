@@ -1,127 +1,124 @@
-import os
-import requests
-from dotenv import load_dotenv
-
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .models import QuizProgress
+from django.db.models import Count
 
-# ======================================
-# LOAD ENV
-# ======================================
-load_dotenv()
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
-
-
-# ======================================
-# HELPER FUNCTION
-# ======================================
-def ask_deepseek(system_prompt, user_prompt, temperature=0.7):
-    if not DEEPSEEK_API_KEY:
-        raise Exception("DEEPSEEK_API_KEY tidak ditemukan di file .env")
-
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "temperature": temperature,
-        "stream": False
-    }
-
-    response = requests.post(DEEPSEEK_URL, headers=headers, json=payload, timeout=30)
-    response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
+from .models import (
+    QuizProgress,
+    GrammarCheck,
+    GrammarMistake,
+    ConversationSession,
+    ConversationMessage,
+    VocabularyQuestion,
+    QuizAttempt,
+    QuizAnswer,
+)
+from .forms import VocabularyQuestionForm
+from .ai_helper import ai_conversation, check_grammar, analyze_conversation
 
 
-# ======================================
-# DASHBOARD UTAMA 
-# ======================================
-@login_required(login_url="login")
+def is_operator(user):
+    return user.is_authenticated and user.is_staff
+
+
+@login_required(login_url='login')
 def dashboard_view(request):
-    progress, created = QuizProgress.objects.get_or_create(user=request.user)
-    
-    # Hitung akurasi total kuis untuk dipajang di widget ringkasan
-    accuracy = 0
-    if progress.total_quiz > 0:
-        accuracy = int((progress.correct_answers / progress.total_quiz) * 100)
-        
-    context = {
-        "progress": progress,
-        "accuracy": accuracy,
-    }
-    return render(request, "dashboard.html", context)
+    progress, _ = QuizProgress.objects.get_or_create(user=request.user)
+
+    grammar_count = GrammarCheck.objects.filter(user=request.user).count()
+    conversation_count = ConversationSession.objects.filter(user=request.user).count()
+
+    latest_recommendation = ''
+    last_conversation = (
+        ConversationSession.objects
+        .filter(user=request.user)
+        .exclude(recommendation='')
+        .first()
+    )
+
+    if last_conversation:
+        latest_recommendation = last_conversation.recommendation
+
+    top_mistake = (
+        GrammarMistake.objects
+        .filter(grammar_check__user=request.user)
+        .values('mistake_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+        .first()
+    )
+
+    return render(request, 'dashboard.html', {
+        'progress': progress,
+        'accuracy': progress.accuracy(),
+        'grammar_count': grammar_count,
+        'conversation_count': conversation_count,
+        'latest_recommendation': latest_recommendation,
+        'top_mistake': top_mistake,
+    })
 
 
-# ======================================
-# LOGIN
-# ======================================
 def login_view(request):
-    if request.method == "POST":
-        username_input = request.POST.get("username")
-        password = request.POST.get("password")
+    if request.method == 'POST':
+        username_input = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
         user = None
 
-        if "@" in username_input:
+        if '@' in username_input:
             try:
                 user_obj = User.objects.get(email=username_input)
-                user = authenticate(request, username=user_obj.username, password=password)
+                user = authenticate(
+                    request,
+                    username=user_obj.username,
+                    password=password
+                )
             except User.DoesNotExist:
                 user = None
         else:
-            user = authenticate(request, username=username_input, password=password)
+            user = authenticate(
+                request,
+                username=username_input,
+                password=password
+            )
 
         if user is not None:
             login(request, user)
-            messages.success(request, f"Welcome back, {user.first_name} 👋")
-            next_url = request.GET.get("next")
-            if next_url:
-                return redirect(next_url)
-            return redirect("dashboard")
-        else:
-            messages.error(request, "Username/email atau password salah.")
+            messages.success(
+                request,
+                f'Welcome back, {user.first_name or user.username} 👋'
+            )
+            return redirect(request.GET.get('next') or 'dashboard')
 
-    return render(request, "login.html")
+        messages.error(request, 'Username/email atau password salah.')
+
+    return render(request, 'login.html')
 
 
-# ======================================
-# REGISTER
-# ======================================
 def register_view(request):
-    if request.method == "POST":
-        fullname = request.POST.get("fullname")
-        username = request.POST.get("username")
-        email = request.POST.get("email")
-        password = request.POST.get("password")
-        confirm_password = request.POST.get("confirm_password")
+    if request.method == 'POST':
+        fullname = request.POST.get('fullname', '').strip()
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '')
+        confirm_password = request.POST.get('confirm_password', '')
 
         if not username or not email or not password:
-            messages.error(request, "Semua field wajib diisi.")
-            return redirect("register")
+            messages.error(request, 'Semua field wajib diisi.')
+            return redirect('register')
 
         if password != confirm_password:
-            messages.error(request, "Konfirmasi password tidak cocok.")
-            return redirect("register")
+            messages.error(request, 'Konfirmasi password tidak cocok.')
+            return redirect('register')
 
-        username = username.strip()
         if User.objects.filter(username=username).exists():
-            messages.error(request, "Username sudah digunakan.")
-            return redirect("register")
+            messages.error(request, 'Username sudah digunakan.')
+            return redirect('register')
 
         if User.objects.filter(email=email).exists():
-            messages.error(request, "Email sudah digunakan.")
-            return redirect("register")
+            messages.error(request, 'Email sudah digunakan.')
+            return redirect('register')
 
         user = User.objects.create_user(
             username=username,
@@ -130,261 +127,457 @@ def register_view(request):
             first_name=fullname
         )
 
-        QuizProgress.objects.create(
-            user=user,
-            score=0,
-            total_quiz=0,
-            correct_answers=0,
-            topic_stats={}
-        )
+        QuizProgress.objects.create(user=user)
 
-        messages.success(request, "Registrasi berhasil! Silakan login menggunakan akun baru Anda. 🎉")
-        return redirect("login")
+        messages.success(request, 'Registrasi berhasil! Silakan login. 🎉')
+        return redirect('login')
 
-    return render(request, "register.html")
+    return render(request, 'register.html')
 
 
-# ======================================
-# LOGOUT
-# ======================================
-@login_required(login_url="login")
+@login_required(login_url='login')
 def logout_view(request):
     logout(request)
-    messages.success(request, "Berhasil logout.")
-    return redirect("login")
+    messages.success(request, 'Berhasil logout.')
+    return redirect('login')
 
 
-# ======================================
-# GRAMMAR CHECKER
-# ======================================
-@login_required(login_url="login")
+@login_required(login_url='login')
 def grammar_view(request):
     result = None
-    user_text = ""
+    user_text = ''
 
-    if request.method == "POST":
-        user_text = request.POST.get("text")
-        prompt = f'Please correct the grammar of this text:\n\n"{user_text}"\n\nReturn format:\nOriginal: ...\nCorrected: ...\nExplanation: ...'
+    if request.method == 'POST':
+        user_text = request.POST.get('text', '').strip()
 
-        try:
-            raw_response = ask_deepseek(
-                system_prompt="You are a professional English grammar assistant. Give concise and accurate corrections.",
-                user_prompt=prompt,
-                temperature=0.3
-            )
-            result = {
-                "original": user_text,
-                "corrected": raw_response,
-                "explanation": "Grammar successfully analyzed."
-            }
-        except Exception as e:
-            result = {
-                "original": user_text,
-                "corrected": "Error connection",
-                "explanation": str(e)
-            }
+        if user_text:
+            response = check_grammar(user_text)
 
-    return render(request, "grammar.html", {"result": result, "user_text": user_text})
+            if response.get('success'):
+                data = response.get('data', {})
 
+                result = {
+                    'original': user_text,
+                    'corrected': data.get('corrected', user_text),
+                    'errors': data.get('errors', []),
+                }
 
-# ======================================
-# AI CHAT (SUDAH DIPERBAIKI DENGAN RIWAYAT/HISTORY ✨)
-# ======================================
-@login_required(login_url="login")
-def chat_view(request):
-    # Inisialisasi riwayat obrolan di session browser jika belum ada
-    if "chat_history" not in request.session:
-        request.session["chat_history"] = []
-
-    if request.method == "POST":
-        user_message = request.POST.get("message", "").strip()
-        
-        if user_message:
-            # Ambil list lama, lalu tambahkan pesan baru dari user
-            history = request.session["chat_history"]
-            history.append({"sender": "user", "text": user_message})
-            
-            try:
-                # Dapatkan respon dari API DeepSeek
-                ai_response = ask_deepseek(
-                    system_prompt="You are a friendly English tutor AI. Reply naturally, practice conversation, correct grammar politely, and keep it short.",
-                    user_prompt=user_message,
-                    temperature=0.7
+                grammar_check = GrammarCheck.objects.create(
+                    user=request.user,
+                    original_text=user_text,
+                    corrected_text=result['corrected'],
+                    score=data.get('score', 0),
+                    feedback=data.get('feedback', ''),
                 )
-            except Exception as e:
-                ai_response = f"Error: {str(e)}"
-            
-            # Tambahkan balasan dari AI ke riwayat obrolan
-            history.append({"sender": "ai", "text": ai_response})
-            
-            # Beritahu Django bahwa data session telah diubah agar disimpan ke database
-            request.session.modified = True
 
-    # Kirim seluruh history obrolan aktif ke template chat.html
-    context = {
-        "chat_history": request.session["chat_history"]
-    }
-    return render(request, "chat.html", context)
+                errors = result['errors']
 
+                if errors:
+                    for err in errors:
+                        mistake_type = err.get('type', 'General Grammar')
 
-# ======================================
-# QUIZ DATA
-# ======================================
-QUIZ_DATA = [
-    {
-        "topic": "Business",
-        "question": 'What does the word "Resilient" mean?',
-        "options": ["A. Easily broken or damaged", "B. Very attractive and charming", "C. Able to recover quickly from difficulties", "D. Moving at a very fast pace"],
-        "answer": "C"
-    },
-    {
-        "topic": "Business",
-        "question": 'What does the idiom "Break the ice" mean?',
-        "options": ["A. Start a friendly conversation", "B. Destroy something cold", "C. Become angry", "D. End a relationship"],
-        "answer": "A"
-    },
-    {
-        "topic": "Business",
-        "question": 'What does the word "Ambitious" mean?',
-        "options": ["A. Lazy", "B. Having strong goals and determination", "C. Easily bored", "D. Very shy"],
-        "answer": "B"
-    },
-    {
-        "topic": "Business",
-        "question": 'What does the idiom "Piece of cake" mean?',
-        "options": ["A. A dessert", "B. Something expensive", "C. Something very easy", "D. Something impossible"],
-        "answer": "C"
-    },
-    {
-        "topic": "Business",
-        "question": 'What does the word "Reliable" mean?',
-        "options": ["A. Can be trusted", "B. Dangerous", "C. Expensive", "D. Nervous"],
-        "answer": "A"
-    },
-    {
-        "topic": "Travel",
-        "question": 'What does the idiom "Hit the books" mean?',
-        "options": ["A. Throw books away", "B. Buy books", "C. Study hard", "D. Write a novel"],
-        "answer": "C"
-    },
-    {
-        "topic": "Travel",
-        "question": 'What does the word "Generous" mean?',
-        "options": ["A. Selfish", "B. Willing to give and share", "C. Angry", "D. Dishonest"],
-        "answer": "B"
-    },
-    {
-        "topic": "Travel",
-        "question": 'What does the idiom "Spill the beans" mean?',
-        "options": ["A. Cook food", "B. Reveal a secret", "C. Waste money", "D. Make a joke"],
-        "answer": "B"
-    },
-    {
-        "topic": "Travel",
-        "question": 'What does the word "Confident" mean?',
-        "options": ["A. Believing in your abilities", "B. Easily scared", "C. Very angry", "D. Uncertain"],
-        "answer": "A"
-    },
-    {
-        "topic": "Travel",
-        "question": 'What does the idiom "Under the weather" mean?',
-        "options": ["A. Feeling sick", "B. Traveling abroad", "C. Feeling excited", "D. Going outside"],
-        "answer": "A"
-    }
-]
+                        if 'vocabulary' in mistake_type.lower() or 'word' in mistake_type.lower():
+                            mistake_type = 'Vocabulary'
+
+                        GrammarMistake.objects.create(
+                            grammar_check=grammar_check,
+                            mistake_type=mistake_type,
+                            original=err.get('original', ''),
+                            correction=err.get('correction', ''),
+                            explanation=err.get('explanation', ''),
+                        )
+                else:
+                    GrammarMistake.objects.create(
+                        grammar_check=grammar_check,
+                        mistake_type='No Grammar Mistake',
+                        original=user_text,
+                        correction=result['corrected'],
+                        explanation='Kalimat sudah cukup baik dan tidak ditemukan kesalahan grammar utama.'
+                    )
+
+            else:
+                result = {
+                    'original': user_text,
+                    'corrected': 'Gagal menganalisis.',
+                    'errors': [],
+                }
+
+    top_errors = (
+        GrammarMistake.objects
+        .filter(grammar_check__user=request.user)
+        .exclude(mistake_type='No Grammar Mistake')
+        .values('mistake_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+
+    return render(request, 'grammar.html', {
+        'result': result,
+        'user_text': user_text,
+        'top_errors': top_errors,
+    })
 
 
-# ======================================
-# QUIZ
-# ======================================
-@login_required(login_url="login")
+@login_required(login_url='login')
+def grammar_history_by_type_view(request, mistake_type):
+    histories = (
+        GrammarMistake.objects
+        .filter(
+            grammar_check__user=request.user,
+            mistake_type=mistake_type
+        )
+        .select_related('grammar_check')
+        .order_by('-grammar_check__created_at')
+    )
+
+    return render(request, 'grammar_history_by_type.html', {
+        'mistake_type': mistake_type,
+        'histories': histories,
+    })
+
+
+@login_required(login_url='login')
+def chat_start_view(request):
+    if request.method == 'POST':
+        topic = request.POST.get('topic', 'Daily Conversation')
+        custom_topic = request.POST.get('custom_topic', '').strip()
+
+        session = ConversationSession.objects.create(
+            user=request.user,
+            topic=topic,
+            custom_topic=custom_topic,
+        )
+
+        return redirect('chat_session', session_id=session.id)
+
+    topics = [choice[0] for choice in ConversationSession.TOPIC_CHOICES]
+    sessions = ConversationSession.objects.filter(user=request.user)[:8]
+
+    return render(request, 'chat_start.html', {
+        'topics': topics,
+        'sessions': sessions
+    })
+
+
+@login_required(login_url='login')
+def chat_session_view(request, session_id):
+    session = get_object_or_404(
+        ConversationSession,
+        id=session_id,
+        user=request.user
+    )
+
+    if request.method == 'POST' and not session.is_finished:
+        user_message = request.POST.get('message', '').strip()
+
+        if user_message:
+            ConversationMessage.objects.create(
+                session=session,
+                sender='user',
+                text=user_message
+            )
+
+            history = list(session.messages.values('sender', 'text'))
+
+            response = ai_conversation(
+                user_message,
+                topic=session.display_topic,
+                history=history
+            )
+
+            ConversationMessage.objects.create(
+                session=session,
+                sender='ai',
+                text=response.get('message', 'Maaf, AI belum bisa merespons.')
+            )
+
+        return redirect('chat_session', session_id=session.id)
+
+    return render(request, 'chat.html', {
+        'session': session,
+        'chat_history': session.messages.all()
+    })
+
+
+@login_required(login_url='login')
+def finish_chat_view(request, session_id):
+    session = get_object_or_404(
+        ConversationSession,
+        id=session_id,
+        user=request.user
+    )
+
+    if request.method == 'POST':
+        analysis = analyze_conversation(
+            session.display_topic,
+            session.messages.all()
+        )
+
+        session.summary = analysis.get('summary', '')
+        session.grammar_score = analysis.get('grammar_score', 0)
+        session.vocabulary_score = analysis.get('vocabulary_score', 0)
+        session.fluency_score = analysis.get('fluency_score', 0)
+        session.recommendation = analysis.get('recommendation', '')
+        session.is_finished = True
+        session.save()
+
+        messages.success(
+            request,
+            'Percakapan selesai dan feedback AI sudah disimpan.'
+        )
+
+    return redirect('chat_session', session_id=session.id)
+
+
+@login_required(login_url='login')
+def clear_chat_view(request, session_id):
+    session = get_object_or_404(
+        ConversationSession,
+        id=session_id,
+        user=request.user
+    )
+
+    if request.method == 'POST':
+        session.messages.all().delete()
+        messages.success(request, 'Isi chat berhasil dibersihkan.')
+
+    return redirect('chat_session', session_id=session.id)
+
+
+@login_required(login_url='login')
+def delete_chat_view(request, session_id):
+    session = get_object_or_404(
+        ConversationSession,
+        id=session_id,
+        user=request.user
+    )
+
+    if request.method == 'POST':
+        session.delete()
+        messages.success(request, 'History chat berhasil dihapus.')
+
+    return redirect('chat')
+
+
+@login_required(login_url='login')
 def quiz_view(request):
-    progress, created = QuizProgress.objects.get_or_create(user=request.user)
-    current_question = int(request.GET.get("q", 0))
+    questions = list(
+        VocabularyQuestion.objects
+        .filter(is_active=True)
+        .order_by('id')
+    )
 
-    if current_question >= len(QUIZ_DATA):
-        return redirect("progress")
+    if not questions:
+        messages.warning(
+            request,
+            'Belum ada soal quiz. Operator perlu menambahkan soal dulu.'
+        )
+        return render(request, 'quiz.html', {
+            'no_questions': True
+        })
 
-    quiz = QUIZ_DATA[current_question]
+    current_index = int(request.GET.get('q', 0))
+
+    if current_index >= len(questions):
+        return redirect('progress')
+
+    question = questions[current_index]
     selected_answer = None
     is_correct = False
 
-    if request.method == "POST":
-        selected_answer = request.POST.get("answer")
-        answered_session_key = f"answered_q_{current_question}"
-        
-        if not request.session.get(answered_session_key, False):
-            progress.total_quiz += 1
-            
-            topic = quiz.get("topic", "Business")
-            
-            if not progress.topic_stats:
-                progress.topic_stats = {}
-            if topic not in progress.topic_stats:
-                progress.topic_stats[topic] = {"correct": 0, "total": 0}
-                
-            progress.topic_stats[topic]["total"] += 1
+    attempt_id = request.session.get('quiz_attempt_id')
+    restart = request.GET.get('restart') == '1'
 
-            if selected_answer == quiz["answer"]:
+    if not attempt_id or (current_index == 0 and restart):
+        attempt = QuizAttempt.objects.create(
+            user=request.user,
+            total_questions=len(questions)
+        )
+        request.session['quiz_attempt_id'] = attempt.id
+        request.session['answered_questions'] = []
+    else:
+        attempt = get_object_or_404(
+            QuizAttempt,
+            id=attempt_id,
+            user=request.user
+        )
+
+    if request.method == 'POST':
+        selected_answer = request.POST.get('answer')
+        answered_questions = request.session.get('answered_questions', [])
+        is_correct = selected_answer == question.correct_option
+
+        if question.id not in answered_questions:
+            QuizAnswer.objects.create(
+                attempt=attempt,
+                question=question,
+                selected_option=selected_answer,
+                is_correct=is_correct,
+            )
+
+            progress, _ = QuizProgress.objects.get_or_create(
+                user=request.user
+            )
+
+            progress.total_quiz += 1
+
+            if is_correct:
                 progress.score += 10
                 progress.correct_answers += 1
-                is_correct = True
-                progress.topic_stats[topic]["correct"] += 1
-                
+                attempt.correct_answers += 1
+                attempt.score += 10
+
+            topic = question.category
+
+            if not progress.topic_stats:
+                progress.topic_stats = {}
+
+            if topic not in progress.topic_stats:
+                progress.topic_stats[topic] = {
+                    'correct': 0,
+                    'total': 0
+                }
+
+            progress.topic_stats[topic]['total'] += 1
+
+            if is_correct:
+                progress.topic_stats[topic]['correct'] += 1
+
             progress.save()
-            request.session[answered_session_key] = True
-        else:
-            if selected_answer == quiz["answer"]:
-                is_correct = True
+            attempt.save()
 
-    context = {
-        "progress": progress,
-        "quiz": quiz,
-        "question_number": current_question + 1,
-        "total_questions": len(QUIZ_DATA),
-        "next_question": current_question + 1,
-        "selected_answer": selected_answer,
-        "is_correct": is_correct
-    }
+            answered_questions.append(question.id)
+            request.session['answered_questions'] = answered_questions
+            request.session.modified = True
 
-    return render(request, "quiz.html", context)
+    return render(request, 'quiz.html', {
+        'quiz': question,
+        'question_number': current_index + 1,
+        'total_questions': len(questions),
+        'next_question': current_index + 1,
+        'selected_answer': selected_answer,
+        'is_correct': is_correct,
+    })
 
 
-# ======================================
-# PROGRESS
-# ======================================
-@login_required(login_url="login")
+@login_required(login_url='login')
 def progress_view(request):
-    progress, created = QuizProgress.objects.get_or_create(user=request.user)
-    accuracy = 0
-
-    if progress.total_quiz > 0:
-        accuracy = int((progress.correct_answers / progress.total_quiz) * 100)
+    progress, _ = QuizProgress.objects.get_or_create(user=request.user)
 
     topic_data = []
-    db_topics = progress.topic_stats if progress.topic_stats else {}
-    
-    target_topics = ["Business", "Travel"]
-    for t in target_topics:
-        if t in db_topics and db_topics[t]["total"] > 0:
-            calc_score = int((db_topics[t]["correct"] / db_topics[t]["total"]) * 100)
-        else:
-            calc_score = 0  
-        topic_data.append({"name": t, "score": calc_score})
+
+    for topic, values in (progress.topic_stats or {}).items():
+        total = values.get('total', 0)
+        correct = values.get('correct', 0)
+        score = int((correct / total) * 100) if total else 0
+
+        topic_data.append({
+            'name': topic,
+            'score': score
+        })
+
+    top_errors = (
+        GrammarMistake.objects
+        .filter(grammar_check__user=request.user)
+        .values('mistake_type')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:5]
+    )
+
+    latest_sessions = ConversationSession.objects.filter(
+        user=request.user,
+        is_finished=True
+    )[:5]
 
     badges = []
+
     if progress.total_quiz > 0:
-        badges.append("First Quiz")
+        badges.append('First Quiz')
+
     if progress.total_quiz >= 7:
-        badges.append("7 Day Streak")
-    if accuracy >= 80 and progress.total_quiz > 0:
-        badges.append("Top Scorer")
+        badges.append('7 Day Streak')
 
-    context = {
-        "progress": progress,
-        "accuracy": accuracy,
-        "topic_data": topic_data,
-        "badges": badges
-    }
+    if progress.accuracy() >= 80 and progress.total_quiz > 0:
+        badges.append('Top Scorer')
 
-    return render(request, "progress.html", context)
+    return render(request, 'progress.html', {
+        'progress': progress,
+        'accuracy': progress.accuracy(),
+        'topic_data': topic_data,
+        'badges': badges,
+        'top_errors': top_errors,
+        'latest_sessions': latest_sessions,
+    })
+
+
+@login_required(login_url='login')
+def reset_progress_view(request):
+    if request.method == 'POST':
+        progress, _ = QuizProgress.objects.get_or_create(user=request.user)
+
+        progress.score = 0
+        progress.total_quiz = 0
+        progress.correct_answers = 0
+        progress.topic_stats = {}
+        progress.save()
+
+        request.session.pop('quiz_attempt_id', None)
+        request.session.pop('answered_questions', None)
+
+        messages.success(request, 'Progress quiz berhasil direset!')
+
+    return redirect('progress')
+
+
+@user_passes_test(is_operator, login_url='dashboard')
+def operator_questions_view(request):
+    questions = VocabularyQuestion.objects.all()
+
+    return render(request, 'operator_questions.html', {
+        'questions': questions
+    })
+
+
+@user_passes_test(is_operator, login_url='dashboard')
+def operator_question_create_view(request):
+    form = VocabularyQuestionForm(request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Soal berhasil ditambahkan.')
+        return redirect('operator_questions')
+
+    return render(request, 'operator_question_form.html', {
+        'form': form,
+        'title': 'Tambah Soal'
+    })
+
+
+@user_passes_test(is_operator, login_url='dashboard')
+def operator_question_update_view(request, pk):
+    question = get_object_or_404(VocabularyQuestion, pk=pk)
+    form = VocabularyQuestionForm(request.POST or None, instance=question)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Soal berhasil diupdate.')
+        return redirect('operator_questions')
+
+    return render(request, 'operator_question_form.html', {
+        'form': form,
+        'title': 'Edit Soal'
+    })
+
+
+@user_passes_test(is_operator, login_url='dashboard')
+def operator_question_delete_view(request, pk):
+    question = get_object_or_404(VocabularyQuestion, pk=pk)
+
+    if request.method == 'POST':
+        question.delete()
+        messages.success(request, 'Soal berhasil dihapus.')
+        return redirect('operator_questions')
+
+    return render(request, 'operator_question_delete.html', {
+        'question': question
+    })

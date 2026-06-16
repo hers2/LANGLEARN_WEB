@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Hapus Soal{% endblock %}
+{% block content %}
+<div class="header-text">
+    <h1>⚠️ Hapus Soal?</h1>
+    <p>Operasi ini tidak dapat dibatalkan</p>
+</div>
+
+<div class="card" style="max-width:600px;">
+    <div class="mini-card" style="background:#fee5e5; border-color:var(--danger);">
+        <p><b>{{ question.question }}</b></p>
+    </div>
+    
+    <div style="display:flex; gap:12px; margin-top:24px;">
+        <form method="POST" style="flex:1;">
+            {% csrf_token %}
+            <button class="small-btn danger" type="submit" style="width:100%;"><i class="fas fa-trash"></i> Ya, Hapus</button>
+        </form>
+        <a class="small-btn" href="{% url 'operator_questions' %}" style="flex:1; text-align:center;"><i class="fas fa-times"></i> Batal</a>
+    </div>
+</div>
+{% endblock %}

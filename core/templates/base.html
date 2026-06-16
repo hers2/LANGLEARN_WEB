@@ -1,81 +1,53 @@
 {% load static %}
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Grammify - {% block title %}{% endblock %}</title>
-
-    <!-- ICON TOPI WISUDA -->
-    <link rel="icon" href="data:image/svg+xml,
-    <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 512'>
-    <path fill='black' d='M622.34 153.69L343.4 44.68a72.15 72.15 0 0 0-46.8 0L17.66 153.69c-23.52 9.2-23.56 42.59 0 51.81l278.94 109a72.15 72.15 0 0 0 46.8 0l278.94-109c23.56-9.22 23.52-42.61 0-51.81zM352 360.13v101.32c0 8.8-7.2 15.55-16 14.91-66.9-4.8-211.2-32.8-272-98.2a23.94 23.94 0 0 1-8-17.9V275.1l240.3 93.9a104.1 104.1 0 0 0 75.4 0L592 275.1v85.16a23.94 23.94 0 0 1-8 17.9c-60.8 65.4-205.1 93.4-272 98.2-8.8.64-16-6.11-16-14.91V360.13z'/>
-    </svg>">
-
+    <title>LangLearn - {% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-
 <body>
-    <div class="app-container">
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="logo"><i class="fas fa-graduation-cap"></i> LangLearn</div>
+        <nav class="nav-menu">
+            <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-th-large"></i><span>Dashboard</span>
+            </a>
+            <a href="{% url 'grammar' %}" class="nav-item {% if request.resolver_match.url_name == 'grammar' %}active{% endif %}">
+                <i class="fas fa-font"></i><span>Grammar Checker</span>
+            </a>
+            <a href="{% url 'chat' %}" class="nav-item {% if 'chat' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-comment-dots"></i><span>AI Conversation</span>
+            </a>
+            <a href="{% url 'quiz' %}?restart=1" class="nav-item {% if request.resolver_match.url_name == 'quiz' %}active{% endif %}">
+                <i class="fas fa-book-open"></i><span>Vocabulary Quiz</span>
+            </a>
+            <a href="{% url 'progress' %}" class="nav-item {% if request.resolver_match.url_name == 'progress' %}active{% endif %}">
+                <i class="fas fa-chart-line"></i><span>Progress</span>
+            </a>
+            {% if request.user.is_staff %}
+            <div class="nav-label">Operator</div>
+            <a href="{% url 'operator_questions' %}" class="nav-item {% if 'operator' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-list-check"></i><span>Setting Soal</span>
+            </a>
+            {% endif %}
+            <a href="{% url 'logout' %}" class="nav-item logout">
+                <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+            </a>
+        </nav>
+    </aside>
 
-        <aside class="sidebar">
-            <div class="logo">
-                <i class="fas fa-graduation-cap"></i> Grammify
+    <main class="main-content">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}<div class="alert {{ message.tags }}">{{ message }}</div>{% endfor %}
             </div>
-
-            <nav class="nav-menu">
-
-                <a href="{% url 'dashboard' %}" 
-                   class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-                    <i class="fas fa-th-large"></i>
-                    <span>Dashboard Home</span>
-                </a>
-
-                <a href="{% url 'grammar' %}" 
-                   class="nav-item {% if request.resolver_match.url_name == 'grammar' %}active{% endif %}">
-                    <i class="fas fa-font"></i>
-                    <span>Grammar Checker</span>
-                </a>
-
-                <a href="{% url 'chat' %}" 
-                   class="nav-item {% if request.resolver_match.url_name == 'chat' %}active{% endif %}">
-                    <i class="fas fa-comment-dots"></i>
-                    <span>AI Conversation</span>
-                </a>
-
-                <a href="{% url 'quiz' %}" 
-                   class="nav-item {% if request.resolver_match.url_name == 'quiz' %}active{% endif %}">
-                    <i class="fas fa-book-open"></i>
-                    <span>Vocabulary Quiz</span>
-                </a>
-
-                <a href="{% url 'progress' %}" 
-                   class="nav-item {% if request.resolver_match.url_name == 'progress' %}active{% endif %}">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Progress</span>
-                </a>
-
-                <div class="sidebar-divider" 
-                     style="border-top: 1px solid rgba(255,255,255,0.1); margin: 15px 0;">
-                </div>
-
-                <a href="{% url 'logout' %}" 
-                   class="nav-item logout-btn" 
-                   style="color: #ff4d4d;">
-                    <i class="fas fa-sign-out-alt"></i>
-                    <span>Logout</span>
-                </a>
-
-            </nav>
-        </aside>
-
-        <main class="main-content">
-            {% block content %}{% endblock %}
-        </main>
-
-    </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
 </body>
 </html>

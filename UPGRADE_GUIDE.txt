@@ -1,0 +1,47 @@
+PANDUAN UPGRADE LANGLEARN
+
+Fitur baru yang ditambahkan:
+1. Grammar Checker menyimpan history ke database.
+2. Grammar Checker menyimpan jenis kesalahan grammar dan vocabulary yang sering salah.
+3. AI Conversation wajib memilih tema/scope sebelum chat.
+4. AI Conversation menyimpan history chat ke database.
+5. User bisa melihat history chat, clear chat, dan delete history.
+6. Setelah conversation selesai, AI memberi feedback: grammar score, vocabulary score, fluency score, rekomendasi.
+7. Vocabulary Quiz tidak lagi memakai QUIZ_DATA di views.py, tetapi memakai database.
+8. Menu Operator untuk tambah/edit/hapus soal quiz.
+9. Dashboard dan Progress menampilkan rekapan belajar.
+
+CARA PASANG:
+1. Backup project lama terlebih dahulu.
+2. Copy folder core dari file upgrade ini ke project lama.
+3. Pastikan settings.py tetap memiliki INSTALLED_APPS = ['core'] dan GROQ_API_KEY.
+4. Aktifkan virtual environment:
+   Windows PowerShell:
+   .\venv\Scripts\activate
+5. Install dependency jika belum ada:
+   pip install django groq python-dotenv
+6. Hapus migrasi lama core jika bentrok:
+   core/migrations/0001_initial.py
+   core/migrations/0002_quizprogress_topic_stats.py
+   Sisakan file __init__.py
+7. Jalankan:
+   python manage.py makemigrations
+   python manage.py migrate
+8. Buat akun operator/admin:
+   python manage.py createsuperuser
+9. Tambahkan contoh soal quiz:
+   python manage.py seed_vocab_questions
+10. Jalankan server:
+   python manage.py runserver
+
+HALAMAN BARU:
+- /grammar/ : Grammar checker + rekapan kesalahan
+- /chat/ : pilih tema + history chat
+- /quiz/ : quiz dari database
+- /progress/ : progress lengkap
+- /operator/questions/ : menu operator setting soal, hanya untuk user is_staff
+
+CATATAN PENTING:
+- Menu operator hanya muncul untuk akun staff/admin.
+- Quiz tidak akan muncul jika belum ada soal aktif di database.
+- AI Conversation dan Grammar Checker tetap membutuhkan GROQ_API_KEY yang aktif.

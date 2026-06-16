@@ -1,65 +1,70 @@
 {% extends 'base.html' %}
-{% block title %}Grammar Checker{% endblock %}
 
-{% load static %}
+{% block title %}Grammar Checker{% endblock %}
 
 {% block content %}
 <div class="header-text">
-    <h1>Grammar Checker</h1>
-    <p>Periksa dan perbaiki tata bahasa Inggris Anda secara instan dengan teknologi AI.</p>
+    <h1>✍️ Grammar Checker</h1>
+    <p>Cek grammar, simpan riwayat kesalahan, lalu lihat pola kesalahan yang sering muncul</p>
 </div>
 
-<div class="card">
-    <form method="POST">
-        {% csrf_token %}
-        <label style="display: block; margin-bottom: 12px; font-weight: 600; font-size: 0.9rem;">Teks Anda:</label>
-        <textarea name="text" rows="8" placeholder="Masukkan kalimat yang ingin diperiksa..." required>{{ user_text }}</textarea>
-        
-        <button type="submit" class="btn-primary" style="margin-top: 1.5rem; width: 100%;">
-            <i class="fas fa-wand-magic-sparkles"></i> Analisis Sekarang
-        </button>
-    </form>
+<div class="two-column">
+    <div class="card">
+        <form method="POST">
+            {% csrf_token %}
 
-    {% if result %}
-    <div class="result-box" style="margin-top: 2.5rem; padding: 2rem; background: #f0f7ff; border-radius: 18px; border: 1px solid #cfe2ff;">
-        <h3 style="color: #0d6efd; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
-            <i class="fas fa-circle-check"></i> Hasil Analisis
-        </h3>
-        <div style="margin-bottom: 1rem;">
-            <small style="color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Original</small>
-            <p style="margin-top: 4px; font-size: 1.1rem;">{{ result.original }}</p>
+            <label><i class="fas fa-pencil-alt"></i> Tulis kalimat bahasa Inggris</label>
+            <textarea 
+                name="text" 
+                placeholder="Example: She go to school every day..."
+                required>{{ user_text }}</textarea>
+
+            <button class="btn-primary" type="submit">
+                <i class="fas fa-magic"></i> Check Grammar
+            </button>
+        </form>
+
+        {% if result %}
+        <div class="result-box">
+            <h3>✨ Hasil Perbaikan</h3>
+
+            <p><b>Kalimat Salah:</b><br>{{ result.original }}</p>
+            <p><b>Hasil Koreksi:</b><br>{{ result.corrected }}</p>
+
+            <h4>📋 Detail Kesalahan</h4>
+
+            {% for error in result.errors %}
+                <div class="mini-card">
+                    <p><b>Jenis Kesalahan:</b> {{ error.type|default:'General Grammar' }}</p>
+                    <p><b>Bagian Salah:</b> <code>{{ error.original }}</code></p>
+                    <p><b>Perbaikan:</b> <code>{{ error.correction }}</code></p>
+                    <p><b>Penjelasan:</b> {{ error.explanation }}</p>
+                </div>
+            {% empty %}
+                <div class="alert success">
+                    <i class="fas fa-check-circle"></i> Tidak ada kesalahan grammar yang ditemukan.
+                </div>
+            {% endfor %}
         </div>
-    <div style="margin-bottom: 1.5rem;">
-    <small style="color: #198754; font-weight: 600; text-transform: uppercase;">
-        Koreksi
-    </small>
+        {% endif %}
+    </div>
 
-    <div style="
-        margin-top: 10px;
-        padding: 16px;
-        background: #ffffff;
-        border-radius: 12px;
-        border-left: 5px solid #198754;
-        line-height: 1.8;
-    ">
-
-        <p style="margin-bottom: 12px;">
-            <strong style="color: #198754;">Corrected:</strong><br>
-            <span style="font-size: 1.05rem; color: #111827;">
-                {{ result.corrected }}
-            </span>
+    <div class="card">
+        <h3>📊 Rekapan Kesalahan</h3>
+        <p class="muted-text">
+            <i class="fas fa-info-circle"></i> Klik jenis kesalahan untuk melihat history sesuai kategori
         </p>
 
-        <p style="margin: 0;">
-            <strong style="color: #0d6efd;">Explanation:</strong><br>
-            <span style="color: #475569;">
-                {{ result.explanation }}
-            </span>
-        </p>
-
+        {% for item in top_errors %}
+            <a 
+                href="{% url 'grammar_history_by_type' item.mistake_type %}" 
+                class="summary-row summary-link">
+                <span>{{ item.mistake_type }}</span>
+                <b>{{ item.total }}x</b>
+            </a>
+        {% empty %}
+            <p class="muted-text">Belum ada data kesalahan.</p>
+        {% endfor %}
     </div>
-</div>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

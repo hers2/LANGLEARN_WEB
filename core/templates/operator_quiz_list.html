@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Operator Quiz{% endblock %}
+{% block content %}
+<div class="header-text">
+    <h1>⚙️ Operator Quiz</h1>
+    <p>Menu operator untuk tambah, edit, hapus, dan mengaktifkan soal vocabulary quiz</p>
+</div>
+
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:20px;">
+        <h3><i class="fas fa-list-check"></i> Daftar Soal</h3>
+        <a href="{% url 'operator_quiz_create' %}" class="btn-primary"><i class="fas fa-plus"></i> Tambah Soal</a>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px;">
+        {% for q in questions %}
+        <div class="mini-card" style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+            <div style="flex:1;">
+                <p><b>{{ q.question|truncatechars:100 }}</b></p>
+                <p class="muted-text">
+                    <i class="fas fa-tag"></i> {{ q.topic }} • 
+                    <i class="fas fa-chart-line"></i> {{ q.level }} • 
+                    <i class="fas fa-check"></i> {{ q.correct_answer }}
+                </p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span class="badge" style="background: {% if q.is_active %}#34c759{% else %}#ff3b30{% endif %}; margin:0;">
+                    {% if q.is_active %}✓ Aktif{% else %}✗ Nonaktif{% endif %}
+                </span>
+                <a href="{% url 'operator_quiz_update' q.id %}" class="small-btn"><i class="fas fa-edit"></i> Edit</a>
+                <a href="{% url 'operator_quiz_delete' q.id %}" class="small-btn danger"><i class="fas fa-trash"></i> Hapus</a>
+            </div>
+        </div>
+        {% empty %}
+        <p class="muted-text" style="text-align:center; padding:2rem;"><i class="fas fa-inbox"></i> Belum ada soal</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

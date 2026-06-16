@@ -4,147 +4,62 @@
 <html lang="id">
 
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>LangLearn - Login</title>
-
     <link rel="stylesheet" href="{% static 'style.css' %}">
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
 <body class="auth-page">
 
     <div class="auth-wrapper">
-
         <div class="auth-card">
+            <h2><i class="fas fa-graduation-cap"></i> LangLearn</h2>
+            <p>Selamat datang kembali 👋</p>
 
-            <h2 style="
-                font-size: 2rem;
-                color: #6366f1;
-                margin-bottom: 0.5rem;
-                text-align:center;
-            ">
-                LangLearn
-            </h2>
-
-            <p style="
-                color: #64748b;
-                margin-bottom: 2rem;
-                text-align:center;
-            ">
-                Selamat datang kembali 👋
-            </p>
-
-            <!-- MESSAGE -->
             {% if messages %}
-
                 {% for message in messages %}
-
-                    <div style="
-                        margin-bottom: 1rem;
-                        padding: 1rem;
-                        border-radius: 12px;
-                        background: #fee2e2;
-                        color: #dc2626;
-                        font-size: 0.95rem;
-                    ">
-
-                        {{ message }}
-
+                    <div class="alert error">
+                        <i class="fas fa-exclamation-circle"></i> {{ message }}
                     </div>
-
                 {% endfor %}
-
             {% endif %}
 
-            <!-- FORM -->
             <form method="POST">
-
                 {% csrf_token %}
 
-                <!-- USERNAME -->
-                <div class="form-group" style="
-                    margin-bottom:1.5rem;
-                ">
-
-                    <label style="
-                        display:block;
-                        margin-bottom:8px;
-                        font-weight:600;
-                    ">
-                        Username / Email
-                    </label>
-
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Username / Email</label>
                     <input
                         type="text"
                         name="username"
                         placeholder="Masukkan username atau email"
                         required
+                        autocomplete="username"
                     >
-
                 </div>
 
-                <!-- PASSWORD -->
-                <div class="form-group" style="
-                    margin-bottom:2rem;
-                ">
-
-                    <label style="
-                        display:block;
-                        margin-bottom:8px;
-                        font-weight:600;
-                    ">
-                        Password
-                    </label>
-
+                <div class="form-group">
+                    <label><i class="fas fa-lock"></i> Password</label>
                     <input
                         type="password"
                         name="password"
                         placeholder="••••••••"
                         required
+                        autocomplete="current-password"
                     >
-
                 </div>
 
-                <!-- BUTTON -->
-                <button
-                    type="submit"
-                    class="btn-primary"
-                    style="
-                        width:100%;
-                    "
-                >
-                    Masuk
+                <button type="submit" class="btn-primary" style="width:100%;">
+                    <i class="fas fa-sign-in-alt"></i> Masuk
                 </button>
-
             </form>
 
-            <!-- FOOTER -->
-            <div style="
-                margin-top:2rem;
-                text-align:center;
-            ">
-
-                Belum punya akun?
-
-                <a
-                    href="{% url 'register' %}"
-                    style="
-                        color:#6366f1;
-                        text-decoration:none;
-                        font-weight:600;
-                    "
-                >
-                    Daftar Akun
-                </a>
-
+            <div class="auth-footer">
+                Belum punya akun? <a href="{% url 'register' %}"><i class="fas fa-user-plus"></i> Daftar Akun</a>
             </div>
-
         </div>
-
     </div>
 
 </body>

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}AI Conversation{% endblock %}
+{% block content %}
+<div class="header-text">
+    <h1>💬 AI Conversation</h1>
+    <p>Pilih scope/tema percakapan dulu agar latihan tidak random</p>
+</div>
+
+<div class="two-column">
+    <div class="card">
+        <h2>🚀 Mulai Percakapan Baru</h2>
+        <form method="POST">
+            {% csrf_token %}
+            <label><i class="fas fa-list"></i> Pilih Tema</label>
+            <select name="topic" id="topic" onchange="toggleCustomTopic()">
+                {% for topic in topics %}<option value="{{ topic }}">{{ topic }}</option>{% endfor %}
+            </select>
+            <div id="custom-topic-box" style="display:none; margin-top:12px;">
+                <label><i class="fas fa-keyboard"></i> Custom Topic</label>
+                <input type="text" name="custom_topic" placeholder="Contoh: Asking direction in campus">
+            </div>
+            <button class="btn-primary" type="submit"><i class="fas fa-play"></i> Start Chat</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>📝 History Chat</h2>
+        {% for item in sessions %}
+            <div class="mini-card history-item">
+                <div><b>{{ item.display_topic }}</b><br><small class="muted-text"><i class="fas fa-clock"></i> {{ item.created_at|date:'d M Y H:i' }}</small></div>
+                <a class="small-btn" href="{% url 'chat_session' item.id %}"><i class="fas fa-eye"></i> Lihat</a>
+            </div>
+        {% empty %}<p class="muted-text">Belum ada history chat</p>{% endfor %}
+    </div>
+</div>
+
+<script>
+function toggleCustomTopic(){
+    const topic = document.getElementById('topic').value;
+    document.getElementById('custom-topic-box').style.display = topic === 'Custom' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

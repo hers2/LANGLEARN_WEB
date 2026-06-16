@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Operator Soal{% endblock %}
+{% block content %}
+<div class="header-text">
+    <h1>⚙️ Operator - Setting Soal Quiz</h1>
+    <p>Operator bisa tambah, edit, hapus, dan menonaktifkan soal vocabulary quiz</p>
+</div>
+
+<div class="card">
+    <a class="btn-primary" href="{% url 'operator_question_add' %}"><i class="fas fa-plus"></i> Tambah Soal</a>
+    <div style="margin-top:20px;">
+        {% for q in questions %}
+        <div class="mini-card" style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-top:12px;">
+            <div style="flex:1;">
+                <p><b>{{ q.question|truncatechars:100 }}</b></p>
+                <p class="muted-text">
+                    <i class="fas fa-tag"></i> {{ q.category }} • 
+                    <i class="fas fa-chart-line"></i> {{ q.difficulty }} • 
+                    <i class="fas fa-check"></i> {{ q.correct_option }}
+                </p>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <span class="badge" style="background: {% if q.is_active %}#34c759{% else %}#ff3b30{% endif %}; margin:0;">
+                    {% if q.is_active %}✓ Aktif{% else %}✗ Nonaktif{% endif %}
+                </span>
+                <a href="{% url 'operator_question_edit' q.id %}" class="small-btn"><i class="fas fa-edit"></i> Edit</a>
+                <a href="{% url 'operator_question_delete' q.id %}" class="small-btn danger"><i class="fas fa-trash"></i> Hapus</a>
+            </div>
+        </div>
+        {% empty %}
+        <p class="muted-text" style="text-align:center; padding:2rem;"><i class="fas fa-inbox"></i> Belum ada soal</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

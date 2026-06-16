@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}History Kesalahan{% endblock %}
+
+{% block content %}
+<div class="header-text">
+    <h1>📋 History Kesalahan</h1>
+    <p>Riwayat kesalahan khusus kategori: <b>{{ mistake_type }}</b></p>
+</div>
+
+<div class="card">
+    {% for item in histories %}
+        <div class="mini-card history-detail">
+            <p><b>❌ Kalimat Salah:</b></p>
+            <p><code>{{ item.grammar_check.original_text }}</code></p>
+
+            <p><b>✅ Hasil Koreksi:</b></p>
+            <p><code>{{ item.grammar_check.corrected_text }}</code></p>
+
+            <p><b>💡 Penjelasan:</b></p>
+            <p>{{ item.explanation }}</p>
+        </div>
+    {% empty %}
+        <p class="muted-text" style="text-align:center; padding:2rem;"><i class="fas fa-inbox"></i> Belum ada history untuk kategori ini</p>
+    {% endfor %}
+
+    <a href="{% url 'grammar' %}" class="small-btn" style="margin-top:1rem;">
+        <i class="fas fa-arrow-left"></i> Kembali
+    </a>
+</div>
+{% endblock %}
